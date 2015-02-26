@@ -35,20 +35,18 @@ mainLoop sock channelMap = do
 runConn :: (Socket, SockAddr) -> ChannelMap -> IO ()
 runConn (sock, sockadr) channelMap = do
     send sock "Topic nr. eingeben \n"
-    --topic <- liftM init $ recv sock 100
-    let topic = "100"
+    t <- recv sock 1024
+    let topic = removeNewLines t
     case Map.lookup topic channelMap of
         Nothing ->
             --send sock "Topic " ++ show topic ++ " doesn't exist"
             runConn (sock, sockadr) channelMap
-            --return ()
-
         (Just channel) ->
-            bla sock channel
+            chat sock channel
 
 
-bla :: Socket -> Chan Msg -> IO()
-bla sock chan = do
+chat :: Socket -> Chan Msg -> IO()
+chat sock chan = do
     let broadcast msg = writeChan chan msg
     send sock "Name eingeben \n"
     user <- recv sock 100
@@ -56,11 +54,14 @@ bla sock chan = do
     forkIO $ forever $ do
         line <- readChan chan'
         if (user /= (fst line)) then
-            send sock $ (fst line) ++ ": " ++ (snd line) ++ "\n"
+            send sock $ (removeNewLines $ fst line) ++ ": " ++ (snd line) ++ "\n"
         else
             return 0
 
     forever $ do
-        line <- liftM init (recv sock 100)
-        broadcast $ (user, line)
+        line <- (recv sock 100)
+        broadcast $ (user, removeNewLines line)
 
+
+removeNewLines :: String -> String
+removeNewLines s = filter (/= '\n') $ filter (/= '\r') s
