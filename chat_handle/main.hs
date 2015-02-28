@@ -25,9 +25,6 @@ main = do
 	channelB <- newChan
 	mainLoop sock $ fromList [("1", channelA), ("2", channelB)]
 
---channels :: ChannelMap
---channels = fromList[("1", channelA), ("2", channelB)]
-
 mainLoop :: Socket -> ChannelMap -> IO()
 mainLoop sock chan = do 
 	--accept one connection and handle it 
@@ -36,25 +33,41 @@ mainLoop sock chan = do
 	mainLoop sock chan
 
 runConn :: (Socket, SockAddr) -> ChannelMap -> IO()
-runConn (sock, _) chanMap = do 
+runConn (sock, addr) chanMap = do 
 	hdl <- socketToHandle sock ReadWriteMode
+	hSetBuffering hdl NoBuffering
+	findChannel hdl chanMap	
+
+findChannel:: Handle -> ChannelMap -> IO()
+findChannel hdl chanMap = do
+	hPutStrLn hdl "Bitte geben Sie die Id des Chatrooms ein:"
+	topic <- liftM init $ hGetLine hdl 
+
+	case Data.Map.lookup topic chanMap of
+	      Nothing -> 
+			do
+			hPutStrLn hdl "Topic ungueltig!"
+			findChannel hdl chanMap
+	      (Just channel) ->
+			chat hdl channel 
+
+chat :: Handle -> Chan Msg -> IO()
+chat hdl chan = do
+	chan' <- dupChan chan
+	let broadcast msg = writeChan chan' msg
+	
 	hPutStrLn hdl "Bitte geben sie Ihr Username ein:" 
 	usr <- liftM init $ hGetLine hdl
-	hPutStrLn hdl "Bitte geben Sie die Id des Chatrooms ein:"
-	id <- liftM init $ hGetLine hdl
-	chan' <- dupChan $ getChannel $ Data.Map.lookup id chanMap
-	let broadcast msg = writeChan chan' msg
 	broadcast (usr, " logged in")
-	hSetBuffering hdl NoBuffering
+	
 	--fork off thread for reading from the duplicated channel
 	forkIO $ forever $ do
 		msg <- readChan chan'
 		when ((fst msg) /= usr) $
 			hPutStrLn hdl $ fst (msg) ++ ":" ++ snd (msg)
+	
 	--read lines from socket and echo them back to the user 
 	forever $ do
 		line <- liftM init $ hGetLine hdl
 		broadcast (usr, line)
 
-getChannel :: Maybe (Chan Msg) -> Chan Msg
-getChannel (Just channel) = channel
