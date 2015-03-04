@@ -27,4 +27,6 @@ data LogEntry = LogEntryDefault { offset  :: Offset
                                   , payload    :: Payload
                                   }
 
-data Log = Log [LogEntry]
+type Log = [LogEntry]
+
+
