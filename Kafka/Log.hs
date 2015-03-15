@@ -9,7 +9,9 @@ import System.IO
 
 --data Offset = Offset Char Char Char Char Char Char Char Char
 --data Offset = Offset Int64
-data Offset = Offset ByteString deriving (Show)
+data Offset = Offset ByteString deriving (Show, Read)
+offsetValue :: Offset -> ByteString --just for debug purposes
+offsetValue (Offset offsetValue) = offsetValue
 
 --data Length = Length Char Char Char Char
 --data Length = Length Int32
@@ -51,8 +53,12 @@ type Log =  [LogEntry]
 main :: IO ()
 main = do
   file <- Data.ByteString.Char8.readFile "00000000000000000000.log"
-  System.IO.putStrLn $ show $ parseOnly offsetParser file
-
+  let d = parseOnly offsetParser file
+  case d of
+    Left l -> System.IO.putStrLn $ show "error"
+    Right x -> do
+      let s = show $ offsetValue x
+      System.IO.putStrLn s
 
 bParser :: Parser B
 bParser = do
