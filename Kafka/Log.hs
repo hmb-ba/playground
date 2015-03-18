@@ -2,97 +2,136 @@
 --where
 
 import Prelude hiding (take)
-import Data.ByteString.Char8 hiding (take)
-import Data.Attoparsec.ByteString
+import Data.ByteString hiding (take)
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Char8 as Char8 
+import Data.Attoparsec.ByteString.Lazy
 import Control.Applicative
 import System.IO
+--import Data.Binary
+import Data.Serialize
+import Data.Int
 
 --data Offset = Offset Char Char Char Char Char Char Char Char
 --data Offset = Offset Int64
-data Offset = Offset ByteString deriving (Show, Read)
-offsetValue :: Offset -> ByteString --just for debug purposes
-offsetValue (Offset offsetValue) = offsetValue
+type Offset = Int64
+type Length = Int32
+type Magic = Bool
+type Attributes = Bool
+type Crc = String
+type A = Char
+type B = String
+type MessageLength = Length
+type Message = String
 
---data Length = Length Char Char Char Char
---data Length = Length Int32
-data Length = Length ByteString
-
-data Magic = Magic Bool
-data Attributes = Attributes Bool
-
---data Crc = Crc Char Char Char Char
-data Crc = Crc ByteString
-
---data A = A Char
-data A = A ByteString
-
---data B = B Char Char Char Char
-data B = B ByteString
-
---data MessageLength = MessageLength Char Char Char Char
-data MessageLength = MessageLength Int
-
-data Message = Message ByteString
-data Payload = Payload A B MessageLength Message
+data Payload = Payload A B MessageLength Message deriving (Show)
 data LogEntry = LogEntryDefault { offset  :: Offset
-                                , length  :: Length
+                                , len :: Length
                                 , magic   :: Magic
                                 , crc     :: Crc
                                 , payload :: Payload
                                 }
               | LogEntryAnnotated { offset     :: Offset
-                                  , length     :: Length
+                                  , len     :: Length
                                   , magic      :: Magic
                                   , attributes :: Attributes
                                   , crc        :: Crc
                                   , payload    :: Payload
                                   }
+              deriving (Show)
 
 type Log =  [LogEntry]
 
 main :: IO ()
 main = do
-  file <- Data.ByteString.Char8.readFile "00000000000000000000.log"
-  let d = parseOnly offsetParser file
-  case d of
-    Left l -> System.IO.putStrLn $ show "error"
-    Right x -> do
-      let s = show $ offsetValue x
-      System.IO.putStrLn s
+  file <- BS.readFile "00000000000000000000.log"
+  print $ BS.unpack file
+  print "hello"
+  parseTest entryParser file
+  print "nacher"
+  --System.IO.putStrLn $ show $ offsetValue d
+  
+  --file <- Char8.readFile "00000000000000000000.log"
+  --let d = parseOnly offsetParser file
+  --case d of
+  --  Left l -> System.IO.putStrLn $ show "error"
+  --  Right x -> do
+  --    System.IO.putStrLn $ show x
+
+entryParser :: Parser LogEntry
+entryParser = do
+  o <- offsetParser
+  l <- lengthParser
+  m <- magicParser
+  --todo: parse attribute field if magic == 1
+  c <- crcParser
+  p <- payloadParser
+  return $ LogEntryDefault { offset = o
+                           , len = l
+                           , magic = m
+                           , crc = c
+                           , payload = p
+                           }
+
+payloadParser :: Parser Payload
+payloadParser = do
+  a <- aParser
+  b <- bParser
+  ml <- lengthParser
+  m <- messageParser ml
+  return $ Payload a b ml m
+
+messageParser :: Length -> Parser Message
+messageParser a = do 
+  m <- take $ fromIntegral a
+  case decode m of
+    Left l -> return "m"
+    Right r -> return r
 
 bParser :: Parser B
 bParser = do
   b <- take 4
-  return $ B b
+  case decode b of
+    Left l -> return "0"
+    Right r -> return r
 
 aParser :: Parser A
 aParser = do
   a <- take 1
-  return $ A a
+  case decode a of
+    Left l -> return '0'
+    Right r -> return r
 
 crcParser :: Parser Crc
 crcParser = do
   c <- take 4
-  return $ Crc c
+  case decode c of 
+    Left l -> return "0"
+    Right r -> return r
 
 attributesParser :: Parser Attributes
 attributesParser = do
-  a <- (string (pack "1") >> return True) <|> return False
-  return $ Attributes a
+  a <- (string (Char8.pack "1") >> return True) <|> return False
+  return a
 
 magicParser :: Parser Magic
 magicParser = do
-  m <- (string (pack "1") >> return True) <|> return False
-  return $ Magic m
+  m <- (string (Char8.pack "1") >> return True) <|> return False
+  return m
 
 lengthParser :: Parser Length
 lengthParser = do
   l <- take 4
-  return $ Length l
+  case (decode l) of
+    Left l -> return $ 0
+    Right r -> return $ r
 
 offsetParser :: Parser Offset
 offsetParser = do
   o <- take 8
-  return $ Offset o
+  let offset = decode o 
+  case offset of
+    Left l -> return 0
+    Right r -> return r
 
 
