@@ -16,19 +16,19 @@ import Data.Int
 --data Offset = Offset Int64
 type Offset = Int64
 type Length = Int32
-type Magic = Bool
+type Magic = Char
 type Attributes = Bool
 type Crc = String
 type A = Char
-type B = String
+type B = Char8.ByteString
 type MessageLength = Length
-type Message = String
+type Message = Char8.ByteString
 
 data Payload = Payload A B MessageLength Message deriving (Show)
 data LogEntry = LogEntryDefault { offset  :: Offset
                                 , len :: Length
-                                , magic   :: Magic
                                 , crc     :: Crc
+                                , magic   :: Magic
                                 , payload :: Payload
                                 }
               | LogEntryAnnotated { offset     :: Offset
@@ -62,14 +62,14 @@ entryParser :: Parser LogEntry
 entryParser = do
   o <- offsetParser
   l <- lengthParser
-  m <- magicParser
   --todo: parse attribute field if magic == 1
   c <- crcParser
+  m <- magicParser
   p <- payloadParser
   return $ LogEntryDefault { offset = o
                            , len = l
-                           , magic = m
                            , crc = c
+                           , magic = m
                            , payload = p
                            }
 
@@ -84,29 +84,31 @@ payloadParser = do
 messageParser :: Length -> Parser Message
 messageParser a = do 
   m <- take $ fromIntegral a
-  case decode m of
-    Left l -> return "m"
-    Right r -> return r
+  return m
+  --case decode m of
+  --  Left l -> return "error in Message"
+  --  Right r -> return r
 
 bParser :: Parser B
 bParser = do
   b <- take 4
-  case decode b of
-    Left l -> return "0"
-    Right r -> return r
+  return b
+  --case decode b of
+  --  Left l -> return $ Char8.pack "error in B"
+  --  Right r -> return r
 
 aParser :: Parser A
 aParser = do
   a <- take 1
   case decode a of
-    Left l -> return '0'
+    Left l -> return 'e'
     Right r -> return r
 
 crcParser :: Parser Crc
 crcParser = do
   c <- take 4
   case decode c of 
-    Left l -> return "0"
+    Left l -> return "error in CRC"
     Right r -> return r
 
 attributesParser :: Parser Attributes
@@ -116,14 +118,16 @@ attributesParser = do
 
 magicParser :: Parser Magic
 magicParser = do
-  m <- (string (Char8.pack "1") >> return True) <|> return False
-  return m
+  m <- take 1
+  case (decode m) of 
+    Left l -> return 'e'
+    Right r -> return r
 
 lengthParser :: Parser Length
 lengthParser = do
   l <- take 4
   case (decode l) of
-    Left l -> return $ 0
+    Left l -> return $ 666
     Right r -> return $ r
 
 offsetParser :: Parser Offset
@@ -131,7 +135,7 @@ offsetParser = do
   o <- take 8
   let offset = decode o 
   case offset of
-    Left l -> return 0
+    Left l -> return 666
     Right r -> return r
 
 
