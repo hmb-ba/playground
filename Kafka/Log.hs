@@ -8,7 +8,6 @@ import qualified Data.ByteString.Char8 as Char8
 import Data.Attoparsec.ByteString.Lazy
 import Control.Applicative
 import System.IO
---import Data.Binary
 import Data.Serialize
 import Data.Int
 
